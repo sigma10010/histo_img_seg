@@ -13,9 +13,9 @@ SE: https://arxiv.org/abs/1709.01507?spm=a2c41.13233144.0.0
 
 SK: https://arxiv.org/abs/1903.06586
 
-Suport multi-head prediction, shortcut connection, dynamic feature selection.
+Support multi-head prediction, shortcut connection, dynamic feature selection.
 
-Suport cross-entropy loss, strutural similarity (SSIM) loss, Dice loss and IoU loss.
+Support cross-entropy loss, strutural similarity (SSIM) loss, Dice loss and IoU loss.
 
 Tested on datasets from PAIP 2019 and PAIP 2020.
 
