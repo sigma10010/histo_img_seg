@@ -17,10 +17,10 @@ Support multi-head prediction, shortcut connection, dynamic feature selection.
 
 Support cross-entropy loss, strutural similarity (SSIM) loss, Dice loss and IoU loss.
 
-Tested on datasets from PAIP 2019 and PAIP 2020.
+Tested on datasets from PAIP 2019 https://paip2019.grand-challenge.org/Dataset/ and PAIP 2020 https://paip2020.grand-challenge.org/Dataset/.
 
 ## PAIP 2019
 ![2019](/results/segmap.jpeg)
 
 ## PAIP 2020
-![2019](/results/segmap2020.jpeg)
+![2020](/results/segmap2020.jpeg)
