@@ -20,7 +20,7 @@ Suport cross-entropy loss, strutural similarity (SSIM) loss, Dice loss and IoU l
 Tested on datasets from PAIP 2019 and PAIP 2020.
 
 ## PAIP 2019
-!(/results/segmap.jpeg)
+![2019](/results/segmap.jpeg)
 
 ## PAIP 2020
-!(/results/segmap2020.jpeg)
+![2019](/results/segmap2020.jpeg)
