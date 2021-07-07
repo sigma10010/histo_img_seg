@@ -62,7 +62,6 @@ class Solver(object):
         self.mode = config.mode
         self.fold = config.fold
         self.level = config.level
-        self.factor_type = config.factor_type
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_type = config.model_type
@@ -97,7 +96,9 @@ class Solver(object):
         elif self.model_type == 'SCU_Net':
             self.unet = UNet_V3(img_ch=3, n_classes=self.n_classes, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = False, is_shortcut = True, conv_type = self.conv_type)
         elif self.model_type in ['SSU_Net', 'SK-SSU_Net', 'SE-SSU_Net', 'SC-SSU_Net' ]:
-            self.unet = UNet_V4(img_ch=3, n_classes=self.n_classes, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = True, is_shortcut = self.is_shortcut, conv_type = self.conv_type)
+            self.unet = UNet_V4(reduction_ratio=self.reduction_ratio, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = True, is_shortcut = self.is_shortcut, conv_type = self.conv_type)
+        else:
+            raise NotImplementedError(self.model_type+" is not implemented")
 
         self.optimizer = optim.Adam(list(self.unet.parameters()), self.lr, [self.beta1, self.beta2])
         self.unet.to(self.device)
@@ -124,6 +125,8 @@ class Solver(object):
             self.criterion = MultiLoss([torch.nn.NLLLoss(), MS_SSIMLoss()], names = ['NLLLoss', 'SSIMLoss'], weights = [1, 1])
         elif self.loss_type =='nll+ssim+iou':
             self.criterion = MultiLoss([torch.nn.NLLLoss(), MS_SSIMLoss(), IoULoss()], names = ['NLLLoss', 'SSIMLoss', 'IoULoss'], weights = [1, 1, 1])
+        else:
+            raise NotImplementedError(self.loss_type+" is not implemented")
 
     def print_network(self, model, name):
         """Print out the network information."""

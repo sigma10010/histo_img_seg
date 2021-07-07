@@ -118,7 +118,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_classes', type=int, default=2)
     parser.add_argument('--category', type=int, default=1, help='category for evaluation label')
     parser.add_argument('--t', type=int, default=2, help='t for Recurrent step of R2U_Net or R2AttU_Net')
-    parser.add_argument('--reduction_ratio', type=int, default=8, help='reduction ratio for attention layer') 
+    parser.add_argument('--reduction_ratio', type=int, default=None, help='reduction ratio for attention layer') 
     parser.add_argument('--n_skip', type=int, default=4, help='number of skip-connection layers, <= depth-1')
     parser.add_argument('--n_head', type=int, default=1, help='number of heads for prediction, 1 <= depth-1') 
     parser.add_argument('--att_mode', type=str, default='cbam', help='cbam/bam/se')
@@ -195,7 +195,9 @@ if __name__ == '__main__':
     elif config.model_type == 'SCU_Net':
         unet = UNet_V3(img_ch=3, n_classes=config.n_classes, n_head = config.n_head, is_scale_selective = False, is_shortcut = True, activation = torch.nn.Softmax(dim=1))
     elif config.model_type in ['SSU_Net', 'SK-SSU_Net', 'SE-SSU_Net', 'SC-SSU_Net' ]:
-        unet = UNet_V4(img_ch=3, n_classes=config.n_classes, n_head = config.n_head, att_mode = config.att_mode, is_scale_selective = True, is_shortcut = config.is_shortcut, conv_type = config.conv_type, activation = torch.nn.Softmax(dim=1))
+        unet = UNet_V4(reduction_ratio=config.reduction_ratio, n_head = config.n_head, att_mode = config.att_mode, is_scale_selective = True, is_shortcut = config.is_shortcut, conv_type = config.conv_type, activation = torch.nn.Softmax(dim=1))
+    else:
+        raise NotImplementedError(config.model_type+" is not implemented")
 
         
     unet_path = os.path.join(config.model_path, '%s-%s-level%s-size%s-depth%s-width%s-n_classes%s-alpha%s-gamma%s-nhead%s-fold%s.pkl'%(config.model_type, config.loss_type, config.level, config.image_size, config.depth, config.width, config.n_classes, config.alpha, config.gamma, config.n_head, config.fold))

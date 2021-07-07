@@ -1,26 +1,34 @@
 # training
 
-python main.py --model_type='SE-SSU_Net' --fold 1 --loss_type='nll' --n_head 2 --att_mode='se'
-python main.py --model_type='SE-SSU_Net' --fold 2 --loss_type='nll' --n_head 2 --att_mode='se'
-python main.py --model_type='SE-SSU_Net' --fold 3 --loss_type='nll' --n_head 2 --att_mode='se'
-python main.py --model_type='SE-SSU_Net' --fold 4 --loss_type='nll' --n_head 2 --att_mode='se'
-python main.py --model_type='SE-SSU_Net' --fold 5 --loss_type='nll' --n_head 2 --att_mode='se'
+
 
 # weights on Cam
 
-python test_wsi.py --model_type='SC-SSU_Net' --fold 1 --loss_type='nll' --n_head 2
-python test_wsi.py --model_type='SC-SSU_Net' --fold 2 --loss_type='nll' --n_head 2
-python test_wsi.py --model_type='SC-SSU_Net' --fold 3 --loss_type='nll' --n_head 2
-python test_wsi.py --model_type='SC-SSU_Net' --fold 4 --loss_type='nll' --n_head 2
-python test_wsi.py --model_type='SC-SSU_Net' --fold 5 --loss_type='nll' --n_head 2
+python test_wsi.py --model_type='UNet' --fold 1 --loss_type='nll' --n_skip 3
+# python test_wsi.py --model_type='UNet' --fold 2 --loss_type='nll' --n_skip 3
+# python test_wsi.py --model_type='UNet' --fold 3 --loss_type='nll' --n_skip 3
+# python test_wsi.py --model_type='UNet' --fold 4 --loss_type='nll' --n_skip 3
+# python test_wsi.py --model_type='UNet' --fold 5 --loss_type='nll' --n_skip 3
+
+# python test_wsi.py --model_type='SE-SSU_Net' --fold 1 --loss_type='nll' --n_head 2 --att_mode='se' --reduction_ratio 8
+# python test_wsi.py --model_type='SE-SSU_Net' --fold 2 --loss_type='nll' --n_head 2 --att_mode='se' --reduction_ratio 8
+# python test_wsi.py --model_type='SE-SSU_Net' --fold 3 --loss_type='nll' --n_head 2 --att_mode='se' --reduction_ratio 8
+# python test_wsi.py --model_type='SE-SSU_Net' --fold 4 --loss_type='nll' --n_head 2 --att_mode='se' --reduction_ratio 8
+# python test_wsi.py --model_type='SE-SSU_Net' --fold 5 --loss_type='nll' --n_head 2 --att_mode='se' --reduction_ratio 8
+
+# python test_wsi.py --model_type='SC-SSU_Net' --fold 1 --loss_type='nll' --n_head 2 --is_shortcut '1'
+# python test_wsi.py --model_type='SC-SSU_Net' --fold 2 --loss_type='nll' --n_head 2 --is_shortcut '1'
+# python test_wsi.py --model_type='SC-SSU_Net' --fold 3 --loss_type='nll' --n_head 2 --is_shortcut '1'
+# python test_wsi.py --model_type='SC-SSU_Net' --fold 4 --loss_type='nll' --n_head 2 --is_shortcut '1'
+# python test_wsi.py --model_type='SC-SSU_Net' --fold 5 --loss_type='nll' --n_head 2 --is_shortcut '1'
 
 # python test_wsi_2020.py --model_type='SSU_Net' --fold 1 --loss_type='nll+ssim' --n_head 2
 # python test_wsi_2020.py --model_type='SSU_Net' --fold 2 --loss_type='nll+ssim' --n_head 2
 # python test_wsi_2020.py --model_type='SSU_Net' --fold 3 --loss_type='nll+ssim' --n_head 2
-# python test_wsi_2020.py --model_type='SSU_Net' --fold 4 --loss_type='nll+ssim' --n_head 2
+python test_wsi_2020.py --model_type='SSU_Net' --fold 4 --loss_type='nll+ssim' --n_head 2
 # python test_wsi_2020.py --model_type='SSU_Net' --fold 5 --loss_type='nll+ssim' --n_head 2
 
-# python test_wsi.py --model_type='SSU_Net' --fold 1 --loss_type='nll' --n_head 2
+python test_wsi.py --model_type='SSU_Net' --fold 1 --loss_type='nll' --n_head 2
 # python test_wsi.py --model_type='SSU_Net' --fold 2 --loss_type='nll' --n_head 2
 # python test_wsi.py --model_type='SSU_Net' --fold 3 --loss_type='nll' --n_head 2
 # python test_wsi.py --model_type='SSU_Net' --fold 4 --loss_type='nll' --n_head 2
@@ -71,7 +79,7 @@ python test_wsi.py --model_type='SC-SSU_Net' --fold 5 --loss_type='nll' --n_head
 # python test_wsi_2020.py --model_type='UNet' --fold 1 --loss_type='nll' 
 # python test_wsi_2020.py --model_type='UNet' --fold 2 --loss_type='nll' 
 # python test_wsi_2020.py --model_type='UNet' --fold 3 --loss_type='nll' 
-# python test_wsi_2020.py --model_type='UNet' --fold 4 --loss_type='nll' 
+python test_wsi_2020.py --model_type='UNet' --fold 4 --loss_type='nll' 
 # python test_wsi_2020.py --model_type='UNet' --fold 5 --loss_type='nll' 
 
 # python test_wsi.py --model_type='MHU_Net' --fold 1 --loss_type='nll' --n_head 2
@@ -163,13 +171,13 @@ python test_wsi.py --model_type='SC-SSU_Net' --fold 5 --loss_type='nll' --n_head
 
 # weights on Titan
 
-python test_wsi.py --model_type='SK-SSU_Net' --fold 1 --loss_type='nll' --n_head 2 --conv_type='sk'
-python test_wsi.py --model_type='SK-SSU_Net' --fold 2 --loss_type='nll' --n_head 2 --conv_type='sk'
-python test_wsi.py --model_type='SK-SSU_Net' --fold 3 --loss_type='nll' --n_head 2 --conv_type='sk'
-python test_wsi.py --model_type='SK-SSU_Net' --fold 4 --loss_type='nll' --n_head 2 --conv_type='sk'
-python test_wsi.py --model_type='SK-SSU_Net' --fold 5 --loss_type='nll' --n_head 2 --conv_type='sk'
+# python test_wsi.py --model_type='SK-SSU_Net' --fold 1 --loss_type='nll' --n_head 2 --conv_type='sk'
+# python test_wsi.py --model_type='SK-SSU_Net' --fold 2 --loss_type='nll' --n_head 2 --conv_type='sk'
+# python test_wsi.py --model_type='SK-SSU_Net' --fold 3 --loss_type='nll' --n_head 2 --conv_type='sk'
+# python test_wsi.py --model_type='SK-SSU_Net' --fold 4 --loss_type='nll' --n_head 2 --conv_type='sk'
+# python test_wsi.py --model_type='SK-SSU_Net' --fold 5 --loss_type='nll' --n_head 2 --conv_type='sk'
 
-# python test_wsi.py --model_type='SSU_Net' --fold 1 --loss_type='nll+ssim' --n_head 2
+python test_wsi.py --model_type='SSU_Net' --fold 1 --loss_type='nll+ssim' --n_head 2
 # python test_wsi.py --model_type='SSU_Net' --fold 2 --loss_type='nll+ssim' --n_head 2
 # python test_wsi.py --model_type='SSU_Net' --fold 3 --loss_type='nll+ssim' --n_head 2
 # python test_wsi.py --model_type='SSU_Net' --fold 4 --loss_type='nll+ssim' --n_head 2
@@ -179,7 +187,7 @@ python test_wsi.py --model_type='SK-SSU_Net' --fold 5 --loss_type='nll' --n_head
 # python test_wsi_2020.py --model_type='SSU_Net' --fold 1 --loss_type='nll' --n_head 2
 # python test_wsi_2020.py --model_type='SSU_Net' --fold 2 --loss_type='nll' --n_head 2
 # python test_wsi_2020.py --model_type='SSU_Net' --fold 3 --loss_type='nll' --n_head 2
-# python test_wsi_2020.py --model_type='SSU_Net' --fold 4 --loss_type='nll' --n_head 2
+python test_wsi_2020.py --model_type='SSU_Net' --fold 4 --loss_type='nll' --n_head 2
 # python test_wsi_2020.py --model_type='SSU_Net' --fold 5 --loss_type='nll' --n_head 2
 
 # python test_wsi.py --model_type='SSU_Net' --fold 1 --loss_type='nll' --n_head 3

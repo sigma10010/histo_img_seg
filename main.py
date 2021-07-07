@@ -91,7 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_classes', type=int, default=2)
     parser.add_argument('--category', type=int, default=1, help='category for evaluation label')
     parser.add_argument('--t', type=int, default=2, help='t for Recurrent step of R2U_Net or R2AttU_Net')
-    parser.add_argument('--reduction_ratio', type=int, default=8, help='reduction ratio for attention layer') 
+    parser.add_argument('--reduction_ratio', type=int, default=None, help='reduction ratio for attention layer') 
     parser.add_argument('--n_skip', type=int, default=4, help='number of skip-connection layers, <= depth-1') 
     parser.add_argument('--n_head', type=int, default=1, help='number of heads for prediction, 1 <= depth-1') 
     parser.add_argument('--att_mode', type=str, default='cbam', help='cbam/bam/se') 
@@ -133,7 +133,6 @@ if __name__ == '__main__':
     parser.add_argument('--result_path', type=str, default='./results/')
     parser.add_argument('--fold', type=int, default=1, help='5-fold cross validation')
     parser.add_argument('--level', type=int, default=2, help='1/2')
-    parser.add_argument('--factor_type', type=str, default='loss_f', help='loss_f/up_sampling/skip_conn/size/depth/width')
     
     # other
     parser.add_argument('--cuda_idx', type=int, default=1)

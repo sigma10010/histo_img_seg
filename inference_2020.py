@@ -79,7 +79,7 @@ def wsi_prediction(s, model, foreground, level, n_class=2, patch_size = 384, ste
                 result[:,i:i+patch_size_i,j:j+patch_size_j] = SR
     return result
 
-def test_wsi(unet, svsf, p1, level, patch_size = 384, category = 1, t=transforms.ToTensor()):
+def test_wsi(model_type, unet, svsf, p1, level, patch_size = 384, category = 1, t=transforms.ToTensor()):
     '''
     svsf: (list) wsi to validate
     '''
@@ -88,22 +88,53 @@ def test_wsi(unet, svsf, p1, level, patch_size = 384, category = 1, t=transforms
     score = 0
     jss = []
     for i, f in enumerate(svsf):
+        print('%d/%d'%(i+1,len(svsf)))
+        
         s=ops.open_slide(p1+f)
-        image= s.read_region((0,0),2,s.level_dimensions[2])
         foreground=io.imread(p1+f.split('.')[0]+'_level%s.tif'%level)
-        pm = p1+f.split('.')[0]+'_level%s_mask.bmp'%level
-        mask = Image.open(pm)
         result = wsi_prediction(s, unet, foreground, level, patch_size = patch_size, foreground_thres = 0.25)
         
-        tep_js = get_MultiClassJS(result,t(mask),label=category)
-        jss.append(tep_js)
-        if tep_js>0.65:
-            score+=tep_js
-            
-        tep_dc = get_MultiClassDC(result,t(mask),label=category)
+        # save numpy as binary map
+        heatmap = result[category,:,:]
+        segmap = result.argmax(0).astype('uint8')
         
-        print('%d/%d'%(i+1,len(svsf)), tep_js, tep_dc)
-    return (score/len(svsf)), jss
+        heatmap_pil = Image.fromarray((heatmap*255).astype('uint8'), 'L')
+        heatmapf = model_type + '_'+f.split('.')[0]+'_heatmap.png'
+        heatmap_pil.save(os.path.join(p1, heatmapf))
+        
+        segmap_pil = Image.fromarray((segmap*255), 'L')
+        segmapf = model_type + '_'+f.split('.')[0]+'_segmap.png'
+        segmap_pil.save(os.path.join(p1, segmapf))
+        
+    return 0
+
+def test_patch(model_type, unet, patches, root, category = 1, t=transforms.ToTensor()):
+    '''
+
+    '''
+    Image.MAX_IMAGE_PIXELS = 933120000000
+    
+    for i, f in enumerate(patches):
+        print('%d/%d'%(i+1,len(patches)))
+        
+        img = Image.open(os.path.join(root, f)).convert("RGB")
+        img = t(img)[0:3,:,:].unsqueeze(0)
+        SR, CR = unet(img)
+        result = SR.squeeze().detach().numpy()
+        
+        # save numpy as binary map
+        heatmap = result[category,:,:]
+        segmap = result.argmax(0).astype('uint8')
+        
+        heatmap_pil = Image.fromarray((heatmap*255).astype('uint8'), 'L')
+        heatmapf = model_type + '_'+f.split('.')[0]+'_heatmap.png'
+        heatmap_pil.save(os.path.join(root, heatmapf))
+        
+        segmap_pil = Image.fromarray((segmap*255), 'L')
+        segmapf = model_type + '_'+f.split('.')[0]+'_segmap.png'
+        segmap_pil.save(os.path.join(root, segmapf))
+        
+    return 0
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -156,7 +187,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_path', type=str, default='./fundus_images/test/')
     parser.add_argument('--result_path', type=str, default='./results/')
     parser.add_argument('--fold', type=int, default=3, help='5-fold cross validation')
-    parser.add_argument('--level', type=int, default=3, help='1/2')
+    parser.add_argument('--level', type=int, default=3, help='1/2/3')
     
     # other
     parser.add_argument('--cuda_idx', type=int, default=1)
@@ -169,9 +200,9 @@ if __name__ == '__main__':
         config.n_skip = config.depth-1
     
     # divide data for k-fold cross validation
-    dd = divide_data(config.root_path)
-    dd.reset() # move data to all/
-    dd.divide(config.fold)
+#     dd = divide_data(config.root_path)
+#     dd.reset() # move data to all/
+#     dd.divide(config.fold)
     
     """Build model"""
     unet = None
@@ -195,6 +226,7 @@ if __name__ == '__main__':
         unet = UNet_V4(reduction_ratio=config.reduction_ratio, n_head = config.n_head, att_mode = config.att_mode, is_scale_selective = True, is_shortcut = config.is_shortcut, conv_type = config.conv_type, activation = torch.nn.Softmax(dim=1))
     else:
         raise NotImplementedError(config.model_type+" is not implemented")
+
         
     unet_path = os.path.join(config.model_path, '%s-%s-level%s-size%s-depth%s-width%s-n_classes%s-alpha%s-gamma%s-nhead%s-fold%s.pkl'%(config.model_type, config.loss_type, config.level, config.image_size, config.depth, config.width, config.n_classes, config.alpha, config.gamma, config.n_head, config.fold))
     print('try to load weights from: %s'%unet_path)
@@ -202,23 +234,25 @@ if __name__ == '__main__':
     unet.train(False)
     unet.eval()
     
-#     print(unet)
-    
-    # validation slide
-    valf=[]
-    for f in os.listdir(config.valid_path):
-        valf.append(f)
-    print(valf)
-        
+    # validation slide, fold1
+    valf=['13', '24', '28', '32', '38', '39', '4', '44', '47']
     svsf=[]
     for f in os.listdir(config.wsi_path):
         if f.endswith(('.svs','.SVS')) and f.split('.')[0] in valf:
             svsf.append(f)
     print(svsf)
     
-    score, jss = test_wsi(unet, svsf, p1 = config.wsi_path, level = config.level, patch_size = config.image_size, category = config.category, t=transforms.ToTensor())
-    print(score)
-    f = open(os.path.join(config.result_path,'result_wsi.csv'), 'a', encoding='utf-8', newline='')
-    wr = csv.writer(f)
-    wr.writerow([config.model_type, config.loss_type, config.level, config.image_size, config.depth, config.width, config.n_classes, config.alpha, config.gamma, config.n_head, config.fold, score]+[js for js in jss])
-    f.close()
+    # wsi prediction
+    s = test_wsi(config.model_type+config.loss_type, unet, svsf, p1 = config.wsi_path, level = config.level, patch_size = config.image_size, category = config.category, t=transforms.ToTensor())
+    print(s)
+    
+#     patchesf = []
+#     proot = config.test_path
+#     for f in os.listdir(proot):
+#         if f.endswith(('.png','.PNG')):
+#             patchesf.append(f)
+#     print(patchesf)
+    
+#     # patches prediction
+#     stage = test_patch(config.model_type, unet, patchesf, proot, category = 1, t=transforms.ToTensor())
+#     print(stage)
