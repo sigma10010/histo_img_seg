@@ -1,8 +1,8 @@
 import argparse
 import os
 from solver import Solver
-from datasets.data_loader import get_loader
-from datasets.data_split import divide_data
+from data.data_loader import get_loader
+# from data.data_split import divide_data
 from torch.backends import cudnn
 import random
 from torchvision import transforms
@@ -47,9 +47,9 @@ def main(config):
     print(config)
     
     # divide data for k-fold cross validation
-    dd = divide_data(config.root_path)
-    dd.reset() # move data to all/
-    dd.divide(config.fold)
+    # dd = divide_data(config.root_path)
+    # dd.reset() # move data to all/
+    # dd.divide(config.fold)
         
     train_loader = get_loader(image_path=config.train_path,
                             anno_path=config.train_anno_path,
@@ -58,6 +58,7 @@ def main(config):
                             data_aug=True,
                             prob=config.augmentation_prob,
                             transform=transforms.Compose([
+                                transforms.Resize(config.image_size),
                                 transforms.ToTensor()
                              ]))
     valid_loader = get_loader(image_path=config.valid_path,
@@ -67,6 +68,7 @@ def main(config):
                             data_aug=False,
                             prob=0.,
                             transform=transforms.Compose([
+                                transforms.Resize(config.image_size),
                                 transforms.ToTensor()
                              ]))
 
@@ -85,25 +87,25 @@ if __name__ == '__main__':
     
     
     # model
-    parser.add_argument('--depth', type=int, default=5, help='#conv blocks, 400-200-100-50-25')
+    parser.add_argument('--depth', type=int, default=5, help='#conv blocks, 512-256-128-64-32')
     parser.add_argument('--width', type=int, default=32, help='#channel, 32-64-128-256-512')
-    parser.add_argument('--image_size', type=int, default=400)
+    parser.add_argument('--image_size', type=int, default=512)
     parser.add_argument('--n_classes', type=int, default=2)
     parser.add_argument('--category', type=int, default=1, help='category for evaluation label')
     parser.add_argument('--t', type=int, default=2, help='t for Recurrent step of R2U_Net or R2AttU_Net')
     parser.add_argument('--reduction_ratio', type=int, default=None, help='reduction ratio for attention layer') 
     parser.add_argument('--n_skip', type=int, default=4, help='number of skip-connection layers, <= depth-1') 
-    parser.add_argument('--n_head', type=int, default=1, help='number of heads for prediction, 1 <= depth-1') 
+    parser.add_argument('--n_head', type=int, default=2, help='number of heads for prediction, 1 <= depth-1') 
     parser.add_argument('--att_mode', type=str, default='cbam', help='cbam/bam/se') 
-    parser.add_argument('--conv_type', type=str, default='basic', help='basic/sk')
-    parser.add_argument('--is_shortcut', type=str2bool, default=False)
+    parser.add_argument('--conv_type', type=str, default='sk', help='basic/sk')
+    parser.add_argument('--is_shortcut', type=str2bool, default=True)
     
     # training hyper-parameters
     parser.add_argument('--img_ch', type=int, default=3)
-    parser.add_argument('--num_epochs', type=int, default=100)
+    parser.add_argument('--num_epochs', type=int, default=300)
     parser.add_argument('--num_epochs_decay', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=4)
-    parser.add_argument('--num_workers', type=int, default=8)
+    parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--beta1', type=float, default=0.5)        # momentum1 in Adam
     parser.add_argument('--beta2', type=float, default=0.999)      # momentum2 in Adam    
@@ -123,13 +125,13 @@ if __name__ == '__main__':
     # misc
     parser.add_argument('--mode', type=str, default='train', help='train/test')
     parser.add_argument('--model_type', type=str, default='U_Net', help='XXU_Net/U_Net/R2U_Net/AttU_Net/R2AttU_Net')
-    parser.add_argument('--model_path', type=str, default='/mnt/DATA_OTHER/paip2019/results/checkpoint/seg/')
-    parser.add_argument('--root_path', type=str, default='/mnt/DATA_OTHER/paip2019/patches/seg/level1_400/')
-    parser.add_argument('--train_path', type=str, default='/mnt/DATA_OTHER/paip2019/patches/seg/level1_400/train/')
-    parser.add_argument('--train_anno_path', type=str, default=None)
-    parser.add_argument('--valid_path', type=str, default='/mnt/DATA_OTHER/paip2019/patches/seg/level1_400/validation/')
-    parser.add_argument('--valid_anno_path', type=str, default=None)
-    parser.add_argument('--test_path', type=str, default='./fundus_images/test/')
+    parser.add_argument('--model_path', type=str, default='./ckpts/')
+    parser.add_argument('--root_path', type=str, default='./datasets/FIVES/')
+    parser.add_argument('--train_path', type=str, default='./datasets/FIVES/512/train/Original/')
+    parser.add_argument('--train_anno_path', type=str, default='./datasets/FIVES/512/train/Groundtruth/')
+    parser.add_argument('--valid_path', type=str, default='./datasets/FIVES/512/test/Original/')
+    parser.add_argument('--valid_anno_path', type=str, default='./datasets/FIVES/512/test/Groundtruth/')
+    parser.add_argument('--test_path', type=str, default='./datasets/FIVES/512/test/Original/')
     parser.add_argument('--result_path', type=str, default='./results/')
     parser.add_argument('--fold', type=int, default=1, help='5-fold cross validation')
     parser.add_argument('--level', type=int, default=2, help='1/2')
@@ -138,9 +140,9 @@ if __name__ == '__main__':
     parser.add_argument('--cuda_idx', type=int, default=1)
 
     config = parser.parse_args()
-    config.root_path = '/mnt/DATA_OTHER/paip2019/patches/seg/level%d_%d/'%(config.level, config.image_size)
-    config.train_path = '/mnt/DATA_OTHER/paip2019/patches/seg/level%d_%d/train/'%(config.level, config.image_size)
-    config.valid_path = '/mnt/DATA_OTHER/paip2019/patches/seg/level%d_%d/validation/'%(config.level, config.image_size)
+    # config.root_path = '/mnt/DATA_OTHER/paip2019/patches/seg/level%d_%d/'%(config.level, config.image_size)
+    # config.train_path = '/mnt/DATA_OTHER/paip2019/patches/seg/level%d_%d/train/'%(config.level, config.image_size)
+    # config.valid_path = '/mnt/DATA_OTHER/paip2019/patches/seg/level%d_%d/validation/'%(config.level, config.image_size)
     if config.n_skip>config.depth-1:
         config.n_skip = config.depth-1
     

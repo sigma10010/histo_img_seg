@@ -9,7 +9,7 @@
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+from timm.layers import DropPath, to_2tuple, trunc_normal_
 
 
 class Mlp(nn.Module):
@@ -584,3 +584,11 @@ class SwinTransformer(nn.Module):
         flops += self.num_features * self.patches_resolution[0] * self.patches_resolution[1] // (2 ** self.num_layers)
         flops += self.num_features * self.num_classes
         return flops
+
+if __name__ == "__main__":
+    H, W = 224, 224
+    input = torch.randn(2, 3, H, W)
+    model = SwinTransformer(img_size = 224)
+    
+    output = model(input)
+    print(output.shape)

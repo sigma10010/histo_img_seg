@@ -10,13 +10,14 @@ import torch.nn.functional as F
 from metrics.evaluation import *
 from models.u_net import U_Net,R2U_Net,AttU_Net,R2AttU_Net,XXU_Net
 from models.unet import UNet, UNet_V1, UNet_V2, UNet_V3, UNet_V4
+from models.swin_unet import SwinTransformerSys
 
 import csv
 from losses.losses import MultiTaskLoss, FocalLoss, IoULoss, MultiLoss, GeneralizedL1Loss, NLLLoss
 from losses.ssim import SSIMLoss, MS_SSIMLoss
 
 class Solver(object):
-    def __init__(self, config, train_loader, valid_loader, metrics = [MultiClassAccumulatedAccuracyMetric(),MultiClassAccumulatedSPMetric(),MultiClassAccumulatedPCMetric(),MultiClassAccumulatedSEMetric(), MultiClassAccumulatedJSMetric(), MultiClassAccumulatedDCMetric()]):
+    def __init__(self, config, train_loader, valid_loader, metrics = [MultiClassAccumulatedSPMetric(),MultiClassAccumulatedPCMetric(),MultiClassAccumulatedSEMetric(), MultiClassAccumulatedJSMetric(), MultiClassAccumulatedDCMetric()]):
         # eveluation metric
         self.metrics = metrics
 
@@ -77,6 +78,8 @@ class Solver(object):
         self.balance = config.balance
         self.init_loss() # init self.criterion
 
+        # torch.autograd.set_detect_anomaly(True)
+
     def build_model(self):
         """Build model""" 
         if self.model_type =='U_Net':
@@ -97,6 +100,8 @@ class Solver(object):
             self.unet = UNet_V3(img_ch=3, n_classes=self.n_classes, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = False, is_shortcut = True, conv_type = self.conv_type)
         elif self.model_type in ['SSU_Net', 'SK-SSU_Net', 'SE-SSU_Net', 'SC-SSU_Net' ]:
             self.unet = UNet_V4(reduction_ratio=self.reduction_ratio, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = True, is_shortcut = self.is_shortcut, conv_type = self.conv_type)
+        elif self.model_type =='SwinUnet':
+            self.unet = SwinTransformerSys(img_size=self.size, num_classes = self.n_classes)
         else:
             raise NotImplementedError(self.model_type+" is not implemented")
 
@@ -151,14 +156,16 @@ class Solver(object):
         """Zero the gradient buffers."""
         self.unet.zero_grad()
         
-    def train(self, save_loss = True):
+    def train(self, save_loss = False):
         """Train encoder, generator and discriminator."""
 
         #====================================== Training ===========================================#
         #===========================================================================================#
 
         unet_path = os.path.join(self.model_path, '%s-%s-level%s-size%s-depth%s-width%s-n_classes%s-alpha%s-gamma%s-nhead%s-fold%s.pkl'%(self.model_type, self.loss_type, self.level, self.size, self.depth, self.width, self.n_classes, self.alpha, self.gamma, self.n_head, self.fold))
-        unet_path_last = unet_path.split('.')[0]+'-%s.pkl'%self.start_epoch
+        unet_path_last = unet_path[0:-4]+'-%s.pkl'%self.start_epoch
+        print(unet_path)
+        print(unet_path_last)
 
         # U-Net Train
         if os.path.isfile(unet_path_last):
@@ -181,11 +188,12 @@ class Solver(object):
                 metric.reset()
 
             for i, (images, GT) in enumerate(self.train_loader):
+                # print(f'{i+1}/{len(self.train_loader)}')
                 # GT : Ground Truth tupple (mask, label)
 
                 images = images.to(self.device)
                 mask = GT[0]
-                mask = mask.to(self.device)
+                mask = mask.squeeze(1).type(torch.LongTensor).to(self.device)
                 label = GT[1].type(mask.type())
                 label = label.to(self.device)
 
@@ -211,9 +219,10 @@ class Solver(object):
                         epoch_losses[key]+=loss.item()
 
                 # Backprop + optimize
-                self.reset_grad()
-                loss.backward()
-                self.optimizer.step()
+                with torch.autograd.set_detect_anomaly(True):
+                    self.reset_grad()
+                    loss.backward()
+                    self.optimizer.step()
 
                 for metric in self.metrics:
                     # cls metric: ACC F1
@@ -234,7 +243,7 @@ class Solver(object):
                 else:
                     losses_disc[key_train].append(epoch_losses[key]/len(self.train_loader)*100)
             for metric in self.metrics:
-                message += '\t{}: {}'.format(metric.name(), metric.value())
+                message += '\t{}: {:.4f}'.format(metric.name(), metric.value())
             print(message)
 
             # Decay learning rate
@@ -254,8 +263,9 @@ class Solver(object):
                 
             epoch_losses = {}
             for i, (images, GT) in enumerate(self.valid_loader):
+                # print(f'{i+1}/{len(self.valid_loader)}')
                 mask = GT[0]
-                mask = mask.to(self.device)
+                mask = mask.squeeze(1).type(torch.LongTensor).to(self.device)
                 label = GT[1].type(mask.type())
                 label = label.to(self.device)
                 images = images.to(self.device)
@@ -300,7 +310,7 @@ class Solver(object):
                     losses_disc[key_test].append(epoch_losses[key]/len(self.valid_loader)*100)
             unet_score = 0
             for i, metric in enumerate(self.metrics):
-                message += '\t{}: {}'.format(metric.name(), metric.value())
+                message += '\t{}: {:.4f}'.format(metric.name(), metric.value())
                 if metric.name()=='JS' or metric.name()=='DC': # only add seg metric
                     unet_score+=float(metric.value())
             print(message)
@@ -329,7 +339,7 @@ class Solver(object):
         #===================================== Test after finishing training====================================#
         del self.unet
         del best_unet
-        self.test()
+        # self.test()
         
     def test(self):
         unet_path = os.path.join(self.model_path, '%s-%s-level%s-size%s-depth%s-width%s-n_classes%s-alpha%s-gamma%s-nhead%s-fold%s.pkl'%(self.model_type, self.loss_type, self.level, self.size, self.depth, self.width, self.n_classes, self.alpha, self.gamma, self.n_head, self.fold))
@@ -344,6 +354,7 @@ class Solver(object):
             metric.reset()
 
         for i, (images, GT) in enumerate(self.valid_loader):
+            print(f'{i+1}/{len(self.valid_loader)}')
             mask = GT[0]
             mask = mask.to(self.device)
             label = GT[1].type(mask.type())
@@ -362,7 +373,7 @@ class Solver(object):
                     metric(SR,mask, label = self.category)
 
 
-        f = open(os.path.join(self.result_path,'result.csv'), 'a', encoding='utf-8', newline='')
+        f = open(os.path.join(self.result_path,'result_fives.csv'), 'a', encoding='utf-8', newline='')
         wr = csv.writer(f)
         wr.writerow([self.model_type, self.loss_type, self.level, self.size, self.depth, self.width, self.n_classes, self.alpha, self.gamma, self.n_head, self.fold]+[float(metric.value()) for metric in self.metrics])
         f.close()

@@ -27,7 +27,7 @@ class SS(nn.Module):
         '''list of feature maps, len: M
         '''
         for i, fea in enumerate(features):
-            fea = fea.unsqueeze_(dim=1)
+            fea = fea.unsqueeze(dim=1)
             if i == 0:
                 feas = fea
             else:

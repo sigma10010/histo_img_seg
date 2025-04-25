@@ -39,7 +39,7 @@ class SKConv(nn.Module):
         
     def forward(self, x):
         for i, conv in enumerate(self.convs):
-            fea = conv(x).unsqueeze_(dim=1)
+            fea = conv(x).unsqueeze(dim=1)
             if i == 0:
                 feas = fea
             else:

@@ -28,7 +28,7 @@ class skconv_block(nn.Module):
         self.feas = nn.Sequential(
             nn.Conv2d(ch_in, ch_out, kernel_size=3,stride=1,padding=1,bias=True),
             nn.BatchNorm2d(ch_out),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
             SKConv(ch_out, WH, M, G, r, stride=stride, L=L)
         )
         self.is_shortcut = is_shortcut
