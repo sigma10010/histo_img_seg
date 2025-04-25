@@ -16,15 +16,32 @@ Support multi-head prediction, shortcut connection, dynamic feature selection.
 
 Support cross-entropy loss, strutural similarity (SSIM) loss, Dice loss and IoU loss.
 
-Tested on datasets from PAIP 2019 https://paip2019.grand-challenge.org/Dataset/ and PAIP 2020 https://paip2020.grand-challenge.org/Dataset/.
+## Datasets
 
-### whole-slide image segmentation
+PAIP 2019 https://paip2019.grand-challenge.org/Dataset/
 
-## PAIP 2019
+PAIP 2020 https://paip2020.grand-challenge.org/Dataset/
+
+FIVES https://figshare.com/articles/figure/FIVES_A_Fundus_Image_Dataset_for_AI-based_Vessel_Segmentation/19688169/1?file=34969398
+
+## whole-slide image segmentation
+
+### PAIP 2019
 ![2019](/results/segmap.jpeg)
 
-## PAIP 2020
+### PAIP 2020
 ![2020](/results/segmap2020.jpeg)
 
-### retinal vessel segmentation
+## retinal vessel segmentation
 
+...
+
+We kindly refer the reader to our articles for further explanation: 
+
+1. Scale-adaptive viable tumor burden estimation via histopathological microscopy image segmentation
+
+https://www.sciencedirect.com/science/article/abs/pii/S0010482525002665
+
+2. Structure-aware scale-adaptive networks for cancer segmentation in whole-slide images
+
+https://arxiv.org/abs/2109.12617
