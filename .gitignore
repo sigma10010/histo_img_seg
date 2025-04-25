@@ -4,7 +4,7 @@ __pycache__/
 
 # 忽略 Jupyter Notebook 的检查点
 .ipynb_checkpoints/
-.ipynb
+*.ipynb
 # 忽略虚拟环境
 venv/
 env/
