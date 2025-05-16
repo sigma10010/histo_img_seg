@@ -1,5 +1,60 @@
-python main.py --model_type='UNet' --fold 1 --loss_type='nll' --n_skip 3
-python main.py --model_type='UNet' --fold 2 --loss_type='nll' --n_skip 3
-python main.py --model_type='UNet' --fold 3 --loss_type='nll' --n_skip 3
-python main.py --model_type='UNet' --fold 4 --loss_type='nll' --n_skip 3
-python main.py --model_type='UNet' --fold 5 --loss_type='nll' --n_skip 3
+# python main.py --model_type='SKU_Net' --conv_type='sk'
+# python main.py --model_type='SKU_Net' --conv_type='sk' --mode='test'
+# python main.py --model_type='SKM3' --conv_type='sk' --M=3
+# python main.py --model_type='SKM3' --conv_type='sk' --M=3 --mode='test'
+# python main.py --model_type='SKM1' --conv_type='sk' --M=1
+# python main.py --model_type='SKM1' --conv_type='sk' --M=1 --mode='test'
+# python main.py --model_type='SSU_Net'
+# python main.py --model_type='SSU_Net' --mode='test'
+# python main.py --model_type='TransUnet'
+# python main.py --model_type='TransUnet' --mode='test'
+# python main.py --model_type='SS4' --n_head=4 
+# python main.py --model_type='SS4' --n_head=4 --mode='test'
+python main.py --model_type='SS2' --n_head=2 --is_scale_selective='0'
+python main.py --model_type='SS2' --n_head=2 --is_scale_selective='0' --mode='test'
+python main.py --model_type='SS3' --n_head=3 --is_scale_selective='0'
+python main.py --model_type='SS3' --n_head=3 --is_scale_selective='0' --mode='test'
+# python main.py --model_type='SS4' --n_head=4 --is_scale_selective='0'
+# python main.py --model_type='SS4' --n_head=4 --is_scale_selective='0' --mode='test'
+# python main.py --model_type='SAtt' --n_head=2 --is_scale_selective='0'
+# python main.py --model_type='SAtt' --n_head=2 --is_scale_selective='0' --mode='test'
+python main.py --model_type='SSU_Net' --reduction_ratio=8 --att_mode='bam' --loss_type='nll+ssim+iou'
+python main.py --model_type='SSU_Net' --reduction_ratio=8 --att_mode='bam' --loss_type='nll+ssim+iou'--mode='test'
+# python main.py --model_type='SSU_Net' --reduction_ratio=8 --conv_type='sk' --att_mode='bam' --start_epoch 90
+# python main.py --model_type='SSU_Net' --reduction_ratio=8 --conv_type='sk' --att_mode='bam' --mode='test'
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk'
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk' --mode='test'
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk' --loss_type='nll+ssim+iou'
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk' --loss_type='nll+ssim+iou' --mode='test'
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk' --loss_type='nll+ssim+iou' --M=3 --n_head=3
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk' --loss_type='nll+ssim+iou' --M=3 --n_head=3 --mode='test'
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk' --loss_type='nll+iou'
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk' --loss_type='nll+iou' --mode='test'
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk' --loss_type='nll+ssim'
+# python main.py --model_type='SK-SSU_Net' --conv_type='sk' --loss_type='nll+ssim' --mode='test'
+# test att
+# python main.py --model_type='SK-SE-U_Net' --conv_type='sk' --reduction_ratio=8 --att_mode='se'
+# python main.py --model_type='SK-SE-U_Net' --conv_type='sk' --reduction_ratio=8 --att_mode='se' --mode='test'
+# python main.py --model_type='SK-BAM-U_Net' --conv_type='sk' --reduction_ratio=8 --att_mode='bam'
+# python main.py --model_type='SK-BAM-U_Net' --conv_type='sk' --reduction_ratio=8 --att_mode='bam' --mode='test'
+# python main.py --model_type='SK-CBAM-U_Net' --conv_type='sk' --reduction_ratio=8 --att_mode='cbam'
+# python main.py --model_type='SK-CBAM-U_Net' --conv_type='sk' --reduction_ratio=8 --att_mode='cbam' --mode='test'
+# test archit
+# python main.py --model_type='TransUnet'
+# python main.py --model_type='TransUnet' --mode='test'
+# python main.py --model_type='AttU_Net'
+# python main.py --model_type='AttU_Net' --mode='test'
+# python main.py --model_type='SEU_Net' --reduction_ratio=8 --att_mode='se'
+# python main.py --model_type='SEU_Net' --reduction_ratio=8 --att_mode='se' --mode='test'
+# python main.py --model_type='CBAMU_Net' --reduction_ratio=8 --att_mode='cbam'
+# python main.py --model_type='CBAMU_Net' --reduction_ratio=8 --att_mode='cbam' --mode='test'
+# python main.py --model_type='BAMU_Net' --reduction_ratio=8 --att_mode='bam'
+# python main.py --model_type='BAMU_Net' --reduction_ratio=8 --att_mode='bam' --mode='test'
+# python main.py --model_type='R2U_Net'
+# python main.py --model_type='R2U_Net' --mode='test'
+# python main.py --model_type='R2AttU_Net'
+# python main.py --model_type='R2AttU_Net' --mode='test'
+# python main.py --model_type='UNet'
+# python main.py --model_type='UNet' --mode='test'
+python main.py --model_type='SwinUnet'
+python main.py --model_type='SwinUnet' --mode='test'

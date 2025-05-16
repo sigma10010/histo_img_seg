@@ -7,8 +7,11 @@ import torch.nn.functional as F
 from .bam import BAM
 from .cbam import CBAM
 from .se import SELayer
+
 from .sk import SKConv
-from .ss import SS
+from .safs import SAFS
+from .appearance_network import AppearanceNetwork
+from .transunet import SkipAttention
 
 class skconv_block(nn.Module):
     def __init__(self,ch_in,ch_out, WH=None, M=2, G=1, r=8, stride=1, L=32, is_shortcut = False, reduction_ratio = None, att_mode = 'cbam'):
@@ -55,8 +58,8 @@ class skconv_block(nn.Module):
         if self.is_shortcut:
             out = out + self.shortcut(x)
         if self.reduction_ratio:
-            scale_weight = self.att_module(out)
-            out = out * scale_weight.expand_as(out)
+            out = self.att_module(out)
+            # out = out * scale_weight.expand_as(out)
         return out
     
 class conv_block_v1(nn.Module):
@@ -98,8 +101,8 @@ class conv_block_v1(nn.Module):
         if self.is_shortcut:
             out = out + self.shortcut(x)
         if self.reduction_ratio:
-            scale_weight = self.att_module(out)
-            out = out * scale_weight.expand_as(out)
+            out = self.att_module(out)
+            # out = out * scale_weight.expand_as(out)
         return out
     
 class conv_block(nn.Module):
@@ -126,20 +129,20 @@ class conv_block(nn.Module):
     def forward(self,x):
         out = self.conv(x)
         if self.reduction_ratio:
-            scale_weight = self.att_module(out)
-            out = out * scale_weight.expand_as(out)
+            out = self.att_module(out)
+            # out = out * scale_weight.expand_as(out)
         return out
     
 class encoder_block_v1(nn.Module):
     '''down_conv
     '''
 
-    def __init__(self, ch_in, ch_out, reduction_ratio, dropout=False, first_block = False, att_mode = 'cbam', conv_type = 'basic'):
+    def __init__(self, ch_in, ch_out, reduction_ratio, dropout=False, first_block = False, att_mode = 'cbam', conv_type = 'basic', M=2):
         super(encoder_block_v1, self).__init__()
         if conv_type == 'basic':
             conv = conv_block(ch_in,ch_out, reduction_ratio, att_mode)
         elif conv_type == 'sk':
-            conv = skconv_block(ch_in,ch_out, reduction_ratio = reduction_ratio, att_mode = att_mode)
+            conv = skconv_block(ch_in,ch_out, reduction_ratio = reduction_ratio, att_mode = att_mode, M=M)
             
         if first_block:
             layers = [conv]
@@ -165,8 +168,8 @@ class encoder_block_v1(nn.Module):
     def forward(self, x):
         out = self.down(x)
         if self.reduction_ratio:
-            scale_weight = self.att_module(out)
-            out = out * scale_weight.expand_as(out)
+            out = self.att_module(out)
+            # out = out * scale_weight.expand_as(out)
         return out
     
 class encoder_block(nn.Module):
@@ -211,8 +214,8 @@ class encoder_block(nn.Module):
     def forward(self, x):
         out = self.down(x)
         if self.reduction_ratio:
-            scale_weight = self.att_module(out)
-            out = out * scale_weight.expand_as(out)
+            out = self.att_module(out)
+            # out = out * scale_weight.expand_as(out)
         return out
     
 class decoder_block(nn.Module):
@@ -240,8 +243,8 @@ class decoder_block(nn.Module):
     def forward(self, x):
         out = self.up(x)
         if self.reduction_ratio:
-            scale_weight = self.att_module(out)
-            out = out * scale_weight.expand_as(out)
+            out = self.att_module(out)
+            # out = out * scale_weight.expand_as(out)
         return out
     
 class head_block(nn.Module):
@@ -270,8 +273,8 @@ class head_block(nn.Module):
     def forward(self, x):
         out = self.up(x)
         if self.reduction_ratio:
-            scale_weight = self.att_module(out)
-            out = out * scale_weight.expand_as(out)
+            out = self.att_module(out)
+            # out = out * scale_weight.expand_as(out)
         return out
     
 class UNet_V4(nn.Module):
@@ -280,13 +283,16 @@ class UNet_V4(nn.Module):
 
     def __init__(self, img_ch=3, n_classes=2, init_features=32, network_depth=5, reduction_ratio=None, n_skip=4, n_head = 3, att_mode = 'cbam', is_scale_selective = False, is_shortcut = False, conv_type = 'basic', activation = nn.LogSoftmax(dim=1)):
         super(UNet_V4, self).__init__()
+        self.appearance_network = AppearanceNetwork(num_input_channels=n_classes+init_features*2**(network_depth-1), num_output_channels=n_classes)
         self.n_classes = n_classes
         self.reduction_ratio = reduction_ratio
         self.network_depth = network_depth
+        self.init_features = init_features
         self.n_skip = n_skip # [1/16,1/8,1/4,1/2,1] [0,1,2,3,4], must <=self.network_depth-1
         self.n_head = n_head
         self.is_scale_selective = is_scale_selective
-        self.ss = SS(M=self.n_head, ch_in=init_features, r=8)
+        self.ss = SAFS(M=self.n_head, ch_in=init_features, r=8)
+        self.scale_att = SkipAttention(init_features, init_features, init_features)
         
         decoder_channel_counts = [] # [512,256,128,64,32] [1/16,1/8,1/4,1/2,1]
 
@@ -317,7 +323,7 @@ class UNet_V4(nn.Module):
                 self.convBlocks.append(skconv_block(decoder_channel_counts[i], decoder_channel_counts[i+1], is_shortcut = is_shortcut))
                 
         self.activation = activation
-        self.seg_head = nn.Conv2d(init_features, n_classes, 1)
+        self.seg_head = nn.Conv2d(init_features, self.n_classes, 1)
         
         self.AvgPool = nn.AdaptiveAvgPool2d(1)
         self.cls_head = nn.Sequential(
@@ -335,9 +341,9 @@ class UNet_V4(nn.Module):
             if i<self.network_depth-1:
                 skip_connections.append(x)
                 
-        cls_output = self.AvgPool(x)
-        cls_output = cls_output.view(cls_output.size()[0], -1) # flatten
-        cls_output = self.activation(self.cls_head(cls_output))
+        # cls_output = self.AvgPool(x)
+        # embedding = cls_output.view(cls_output.size()[0], -1) # flatten (B, embed_dim)
+        # cls_output = self.activation(self.cls_head(embedding))
         
         x_heads = []
         for i in range(self.network_depth-1):
@@ -354,6 +360,8 @@ class UNet_V4(nn.Module):
         if self.is_scale_selective:
             x_seg = self.seg_head(self.ss(x_heads))
         else:
+            # print(len(x_heads), 'doing satt')
+            # x_seg = self.seg_head(self.scale_att(x_heads[0], x_heads[1]))
             n_head = len(x_heads)
             for i, x_head in enumerate(x_heads):
                 if i==0:
@@ -361,10 +369,39 @@ class UNet_V4(nn.Module):
                 else:
                     x_seg+=self.seg_head(x_head)
             x_seg/=n_head
-                
-        seg_output = self.activation(x_seg) 
-        return seg_output, cls_output
+        
+        seg_output = self.activation(x_seg)
+        # seg_dual = self.activation(self.decouple_appearance(x_seg, embedding)) 
+        return seg_output, torch.rand(1)
+        # return {'seg_output': seg_output, 'cls_output': cls_output, 'seg_dual': seg_dual}
     
+    def decouple_appearance(self, image, appearance_embedding):
+        # image: (B, 2, h, w)
+        # appearance_embedding: (B, dim)
+        # print(image.shape)
+        # print(appearance_embedding.shape)
+
+        B, C, H, W = image.shape
+        _, C_emb = appearance_embedding.shape  # (B, 512)
+
+        # Step 1: Downsample images to (H/32, W/32)
+        down_factor = self.init_features*2**(self.network_depth-1)
+        crop_image_down = F.interpolate(image, size=(H // down_factor, W // down_factor), mode="bilinear", align_corners=True)  # (B, 2, H/32, W/32)
+
+        # Step 2: Expand appearance embeddings
+        appearance_map = appearance_embedding.view(B, C_emb, 1, 1).expand(B, C_emb, H // down_factor, W // down_factor)  # (B, 64, H/32, W/32)
+
+        # Step 3: Concatenate along channel dimension
+        crop_input = torch.cat([crop_image_down, appearance_map], dim=1)  # (B, 2+64, H/32, W/32)
+
+        # Step 4: Pass through appearance network
+        mapping_image = self.appearance_network(crop_input, H, W)  # (B, 2, H, W)
+
+        # Step 5: Element-wise multiply
+        transformed_image = mapping_image * image  # (B, 2, H, W)
+
+        return transformed_image
+
     def count_parameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
     
@@ -380,7 +417,7 @@ class UNet_V3(nn.Module):
         self.n_skip = n_skip # [1/16,1/8,1/4,1/2,1] [0,1,2,3,4], must <=self.network_depth-1
         self.n_head = n_head
         self.is_scale_selective = is_scale_selective
-        self.ss = SS(M=self.n_head, ch_in=init_features, r=8)
+        self.ss = SAFS(M=self.n_head, ch_in=init_features, r=8)
         
         decoder_channel_counts = [] # [512,256,128,64,32] [1/16,1/8,1/4,1/2,1]
 
@@ -411,7 +448,7 @@ class UNet_V3(nn.Module):
                 self.convBlocks.append(skconv_block(decoder_channel_counts[i], decoder_channel_counts[i+1], is_shortcut = is_shortcut))
                 
         self.activation = activation
-        self.seg_head = nn.Conv2d(init_features, n_classes, 1)
+        self.seg_head = nn.Conv2d(init_features, self.n_classes, 1)
         
         self.AvgPool = nn.AdaptiveAvgPool2d(1)
         self.cls_head = nn.Sequential(
@@ -504,7 +541,7 @@ class UNet_V2(nn.Module):
                 self.convBlocks.append(skconv_block(decoder_channel_counts[i], decoder_channel_counts[i+1], is_shortcut = is_shortcut))
                 
         self.activation = activation
-        self.seg_head = nn.Conv2d(init_features, n_classes, 1)
+        self.seg_head = nn.Conv2d(init_features, self.n_classes, 1)
         
         self.AvgPool = nn.AdaptiveAvgPool2d(1)
         self.cls_head = nn.Sequential(
@@ -560,7 +597,7 @@ class UNet_V1(nn.Module):
     '''reduction_ratio = None -> U-NET
     '''
 
-    def __init__(self, img_ch=3, n_classes=2, init_features=32, network_depth=5, reduction_ratio=8, n_skip=4, att_mode = 'cbam', is_shortcut = False, conv_type = 'basic', activation = nn.LogSoftmax(dim=1)):
+    def __init__(self, img_ch=3, n_classes=2, init_features=32, network_depth=5, M=2, reduction_ratio=8, n_skip=4, att_mode = 'cbam', is_shortcut = False, conv_type = 'basic', activation = nn.LogSoftmax(dim=1)):
         super(UNet_V1, self).__init__()
         self.n_classes = n_classes
         self.reduction_ratio = reduction_ratio
@@ -589,10 +626,10 @@ class UNet_V1(nn.Module):
             if conv_type == 'basic':
                 self.convBlocks.append(conv_block(decoder_channel_counts[i], decoder_channel_counts[i+1], reduction_ratio=self.reduction_ratio, att_mode = att_mode))
             elif conv_type == 'sk':
-                self.convBlocks.append(skconv_block(decoder_channel_counts[i], decoder_channel_counts[i+1], is_shortcut = is_shortcut))
+                self.convBlocks.append(skconv_block(decoder_channel_counts[i], decoder_channel_counts[i+1], is_shortcut = is_shortcut, M=M))
                 
         self.activation = activation
-        self.seg_head = nn.Conv2d(init_features, n_classes, 1)
+        self.seg_head = nn.Conv2d(init_features, self.n_classes, 1)
         
         self.AvgPool = nn.AdaptiveAvgPool2d(1)
         self.cls_head = nn.Sequential(
@@ -658,7 +695,7 @@ class UNet(nn.Module):
         for i in range(self.n_skip):
             self.convBlocks.append(conv_block(decoder_channel_counts[i], decoder_channel_counts[i+1], reduction_ratio=self.reduction_ratio, att_mode = att_mode))
         self.activation = activation
-        self.seg_head = nn.Conv2d(init_features, n_classes, 1)
+        self.seg_head = nn.Conv2d(init_features, self.n_classes, 1)
         
         self.AvgPool = nn.AdaptiveAvgPool2d(1)
         self.cls_head = nn.Sequential(

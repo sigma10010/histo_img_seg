@@ -96,13 +96,15 @@ if __name__ == '__main__':
     parser.add_argument('--reduction_ratio', type=int, default=None, help='reduction ratio for attention layer') 
     parser.add_argument('--n_skip', type=int, default=4, help='number of skip-connection layers, <= depth-1') 
     parser.add_argument('--n_head', type=int, default=2, help='number of heads for prediction, 1 <= depth-1') 
-    parser.add_argument('--att_mode', type=str, default='cbam', help='cbam/bam/se') 
-    parser.add_argument('--conv_type', type=str, default='sk', help='basic/sk')
+    parser.add_argument('--att_mode', type=str, default='bam', help='cbam/bam/se') 
+    parser.add_argument('--conv_type', type=str, default='basic', help='basic/sk')
     parser.add_argument('--is_shortcut', type=str2bool, default=True)
+    parser.add_argument('--M', type=int, default=2, help='# kernel for SK net')
+    parser.add_argument('--is_scale_selective', type=str2bool, default=True)
     
     # training hyper-parameters
     parser.add_argument('--img_ch', type=int, default=3)
-    parser.add_argument('--num_epochs', type=int, default=300)
+    parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--num_epochs_decay', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--num_workers', type=int, default=16)

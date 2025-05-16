@@ -1,18 +1,18 @@
-# Selective-scale networks
+# scale adaptive feature selection
 
 import torch
 from torch import nn
 
 
-class SS(nn.Module):
+class SAFS(nn.Module):
     def __init__(self, M, ch_in, r):
         """ 
         Args:
-            M (int): number of heads.
+            M (int): number of features.
             ch_in (int): input channel dimensionality.
             r: the radio for compute d, the length of z.
         """
-        super(SS, self).__init__()
+        super(SAFS, self).__init__()
         d = int(ch_in/r)
         self.M = M
         self.fc = nn.Linear(ch_in, d)

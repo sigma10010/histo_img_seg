@@ -11,6 +11,10 @@ from metrics.evaluation import *
 from models.u_net import U_Net,R2U_Net,AttU_Net,R2AttU_Net,XXU_Net
 from models.unet import UNet, UNet_V1, UNet_V2, UNet_V3, UNet_V4
 from models.swin_unet import SwinTransformerSys
+from models.transunet import TransUNetWithAttention
+from models.vit_seg_modeling import VisionTransformer as ViT_seg
+from models.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
+from models.swinunet import SwinU
 
 import csv
 from losses.losses import MultiTaskLoss, FocalLoss, IoULoss, MultiLoss, GeneralizedL1Loss, NLLLoss
@@ -41,6 +45,8 @@ class Solver(object):
         self.n_skip = config.n_skip
         self.n_head = config.n_head
         self.is_shortcut = config.is_shortcut
+        self.M = config.M
+        self.is_scale_selective = config.is_scale_selective
 
         # Hyper-parameters
         self.lr = config.lr
@@ -77,6 +83,7 @@ class Solver(object):
         self.gamma = config.gamma
         self.balance = config.balance
         self.init_loss() # init self.criterion
+        self.ssim_loss = MS_SSIMLoss()
 
         # torch.autograd.set_detect_anomaly(True)
 
@@ -92,16 +99,24 @@ class Solver(object):
             self.unet = R2AttU_Net(img_ch=3,t=self.t, n_classes = self.n_classes)
         elif self.model_type in ['UNet', 'SEU_Net', 'CBAMU_Net', 'BAMU_Net']:
             self.unet = UNet(img_ch=3, n_classes=self.n_classes, init_features=self.width, network_depth=self.depth, reduction_ratio=self.reduction_ratio, att_mode = self.att_mode)
-        elif self.model_type in ['SKU_Net', 'SK-SC-U_Net', 'SK-SE-U_Net']:
-            self.unet = UNet_V1(img_ch=3, n_classes=self.n_classes, init_features=self.width, network_depth=self.depth, reduction_ratio=self.reduction_ratio, att_mode = self.att_mode, is_shortcut = self.is_shortcut, conv_type = self.conv_type)
+        elif self.model_type in ['SKU_Net','SKM1', 'SKM3', 'SK-SC-U_Net', 'SK-SE-U_Net', 'SK-CBAM-U_Net', 'SK-BAM-U_Net']:
+            self.unet = UNet_V1(img_ch=3, n_classes=self.n_classes, init_features=self.width, network_depth=self.depth, M=self.M, reduction_ratio=self.reduction_ratio, att_mode = self.att_mode, is_shortcut = self.is_shortcut, conv_type = self.conv_type)
         elif self.model_type == 'MHU_Net':
             self.unet = UNet_V2(img_ch=3, n_classes=self.n_classes, n_head = self.n_head, att_mode = self.att_mode, is_head_selective = False, is_shortcut = False, conv_type = self.conv_type)
         elif self.model_type == 'SCU_Net':
             self.unet = UNet_V3(img_ch=3, n_classes=self.n_classes, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = False, is_shortcut = True, conv_type = self.conv_type)
-        elif self.model_type in ['SSU_Net', 'SK-SSU_Net', 'SE-SSU_Net', 'SC-SSU_Net' ]:
-            self.unet = UNet_V4(reduction_ratio=self.reduction_ratio, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = True, is_shortcut = self.is_shortcut, conv_type = self.conv_type)
+        elif self.model_type in ['SSU_Net','SAtt','SS4','SS3', 'SS2', 'SK-SSU_Net', 'SE-SSU_Net', 'SC-SSU_Net' ]:
+            self.unet = UNet_V4(n_classes=self.n_classes, reduction_ratio=self.reduction_ratio, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = self.is_scale_selective, is_shortcut = self.is_shortcut, conv_type = self.conv_type)
         elif self.model_type =='SwinUnet':
-            self.unet = SwinTransformerSys(img_size=self.size, num_classes = self.n_classes)
+            # self.unet = SwinTransformerSys(img_size=self.size, num_classes = self.n_classes)
+            self.unet = SwinU()
+        elif self.model_type =='TransUnet':
+            # self.unet = TransUNetWithAttention(in_ch=3, out_ch=self.n_classes)
+            vit_name ='ViT-B_16'
+            config_vit = CONFIGS_ViT_seg[vit_name]
+            config_vit.n_classes = 2
+            config_vit.n_skip = 0
+            self.unet = ViT_seg(config_vit)
         else:
             raise NotImplementedError(self.model_type+" is not implemented")
 
@@ -199,11 +214,19 @@ class Solver(object):
 
                 # SR : Segmentation Result
                 # CR : Classification Result
+                # output_dict = self.unet(images)
+                # SR = output_dict['seg_output']
+                # SR_dual = output_dict['seg_dual']
                 SR, CR = self.unet(images)
+
+                # print(SR.shape, mask.shape)
+                # print(mask.min(), mask.max())
                 loss_outputs = self.criterion(SR,mask)
+                # loss_dual = self.criterion(SR_dual,mask)
                 
                 if type(loss_outputs) is dict:
                     loss = loss_outputs['total_loss']
+                    # loss = loss_outputs['total_loss']+loss_dual['total_loss']
                     for key in loss_outputs.keys():
                         loss_key = loss_outputs[key]
                         if key not in epoch_losses.keys():
@@ -212,6 +235,7 @@ class Solver(object):
                             epoch_losses[key]+=loss_key.item()
                 else:
                     loss = loss_outputs
+                    # loss = loss_outputs+loss_dual
                     key = 'total_loss'
                     if key not in epoch_losses.keys():
                         epoch_losses[key]=loss.item()
@@ -227,11 +251,12 @@ class Solver(object):
                 for metric in self.metrics:
                     # cls metric: ACC F1
                     if metric.name()=='Accuracy' or metric.name()=='F1':
-                        metric(CR,label)
+                        print('Accuracy')
+                        # metric(CR,label)
                     # seg metric: JS DC
                     else:
                         metric(SR,mask, label = self.category)
-#                         metric(SR,mask, label = self.category)
+                        # metric(SR,mask)
 
             # Print the log info
             message = 'Epoch: {}/{}. Train set: '.format(epoch+1, self.num_epochs)
@@ -271,6 +296,8 @@ class Solver(object):
                 images = images.to(self.device)
 
                 SR, CR = self.unet(images)
+                # output_dict = self.unet(images)
+                # SR = output_dict['seg_output']
                 label = label.view(label.size(0),-1)
                 
                 loss_outputs = self.criterion(SR,mask)
@@ -294,10 +321,12 @@ class Solver(object):
                 for metric in self.metrics:
                     # cls metric: ACC F1
                     if metric.name()=='Accuracy' or metric.name()=='F1':
-                        metric(CR,label)
+                        print('Accuracy')
+                        # metric(CR,label)
                     # seg metric: JS DC
                     else:
                         metric(SR,mask, label = self.category)
+                        # metric(SR,mask)
 
             # Print the log info
             message = 'Epoch: {}/{}. Valid set: '.format(epoch+1, self.num_epochs)
@@ -362,15 +391,19 @@ class Solver(object):
             images = images.to(self.device)
 
             SR, CR = self.unet(images)
+            # output_dict = self.unet(images)
+            # SR = output_dict['seg_output']
             label = label.view(label.size(0),-1)
 
             for metric in self.metrics:
                 # cls metric: ACC F1
                 if metric.name()=='Accuracy' or metric.name()=='F1':
-                    metric(CR,label)
+                    print('Accuracy')
+                    # metric(CR,label)
                 # seg metric: JS DC
                 else:
                     metric(SR,mask, label = self.category)
+                    # metric(SR,mask)
 
 
         f = open(os.path.join(self.result_path,'result_fives.csv'), 'a', encoding='utf-8', newline='')

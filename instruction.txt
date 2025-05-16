@@ -1,0 +1,6 @@
+source miniconda3/bin/activate
+conda activate med
+cd med_img_seg/
+cat ./results/result_fives.csv to check the model_type at the last line, the model training and testing are done.  
+comment the corresponding lines (same model_type, two as a group) in the training-and-test.sh
+bash training-and-test.sh

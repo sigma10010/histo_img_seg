@@ -1,4 +1,6 @@
-Implementaion of the scale-adaptive U-Net/Swin-Unet with attention gate (AG), bottleneck attention module (BAM), convolutional block attention module (CBAM), squeeze-and-exitation (SE) and selective-kernel (SK).
+Implementaion of the U-Net/Swin-Unet with attention techniques including attention gate (AG), bottleneck attention module (BAM), convolutional block attention module (CBAM), squeeze-and-exitation (SE) and selective-kernel (SK). Support shortcut connection, multi-scale feature fusion, scale-adaptive feature selection (SAFS). Support cross-entropy loss, structural similarity (SSIM) loss, Dice loss and IoU loss ...
+
+## References
 
 AG: https://arxiv.org/abs/1808.08114
 
@@ -11,10 +13,6 @@ SE: https://arxiv.org/abs/1709.01507?spm=a2c41.13233144.0.0
 SK: https://arxiv.org/abs/1903.06586
 
 Swin-Unet: https://arxiv.org/abs/2105.05537
-
-Support multi-head prediction, shortcut connection, dynamic feature selection.
-
-Support cross-entropy loss, strutural similarity (SSIM) loss, Dice loss and IoU loss.
 
 ## Datasets
 
