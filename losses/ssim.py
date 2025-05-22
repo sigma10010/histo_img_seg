@@ -217,7 +217,7 @@ def _multi_scale_ssim(x: torch.Tensor, y: torch.Tensor, data_range: Union[int, f
     mcs_ssim = torch.relu(torch.stack(mcs[:-1] + [ssim_val], dim=0))
 
     # weights, (level)
-    msssim_val = torch.prod((mcs_ssim ** scale_weights.view(-1, 1, 1)), dim=0).mean(1)
+    msssim_val = torch.prod((mcs_ssim.clamp(min=1e-6) ** scale_weights.view(-1, 1, 1)), dim=0).mean(1)
 
     return msssim_val
 
@@ -270,7 +270,7 @@ def _multi_scale_ssim_complex(x: torch.Tensor, y: torch.Tensor, data_range: Unio
 
     mcs_ssim_real = mcs_ssim[..., 0]
     mcs_ssim_imag = mcs_ssim[..., 1]
-    mcs_ssim_abs = (mcs_ssim_real.pow(2) + mcs_ssim_imag.pow(2)).sqrt()
+    mcs_ssim_abs = (mcs_ssim_real.clamp(min=1e-6).pow(2) + mcs_ssim_imag.clamp(min=1e-6).pow(2)).sqrt().clamp(min=1e-6)
     mcs_ssim_deg = torch.atan2(mcs_ssim_imag, mcs_ssim_real)
 
     mcs_ssim_pow_abs = mcs_ssim_abs ** scale_weights.view(-1, 1, 1)
@@ -353,7 +353,7 @@ def gaussian_filter(kernel_size: int, sigma: float) -> torch.Tensor:
     coords = torch.arange(kernel_size).to(dtype=torch.float32)
     coords -= (kernel_size - 1) / 2.
 
-    g = coords ** 2
+    g = coords.clamp(min=1e-6) ** 2
     g = (- (g.unsqueeze(0) + g.unsqueeze(1)) / (2 * sigma ** 2)).exp()
 
     g /= g.sum()
@@ -533,12 +533,12 @@ def _ssim_per_channel(x: torch.Tensor, y: torch.Tensor, kernel: torch.Tensor,
     mu_x = F.conv2d(x, weight=kernel, stride=1, padding=0, groups=n_channels)
     mu_y = F.conv2d(y, weight=kernel, stride=1, padding=0, groups=n_channels)
 
-    mu_xx = mu_x ** 2
-    mu_yy = mu_y ** 2
+    mu_xx = mu_x.clamp(min=1e-6) ** 2
+    mu_yy = mu_y.clamp(min=1e-6) ** 2
     mu_xy = mu_x * mu_y
 
-    sigma_xx = F.conv2d(x ** 2, weight=kernel, stride=1, padding=0, groups=n_channels) - mu_xx
-    sigma_yy = F.conv2d(y ** 2, weight=kernel, stride=1, padding=0, groups=n_channels) - mu_yy
+    sigma_xx = F.conv2d(x.clamp(min=1e-6) ** 2, weight=kernel, stride=1, padding=0, groups=n_channels) - mu_xx
+    sigma_yy = F.conv2d(y.clamp(min=1e-6) ** 2, weight=kernel, stride=1, padding=0, groups=n_channels) - mu_yy
     sigma_xy = F.conv2d(x * y, weight=kernel, stride=1, padding=0, groups=n_channels) - mu_xy
 
     # Contrast sensitivity (CS) with alpha = beta = gamma = 1.
@@ -585,15 +585,15 @@ def _ssim_per_channel_complex(x: torch.Tensor, y: torch.Tensor, kernel: torch.Te
     mu2_real = F.conv2d(y_real, weight=kernel, stride=1, padding=0, groups=n_channels)
     mu2_imag = F.conv2d(y_imag, weight=kernel, stride=1, padding=0, groups=n_channels)
 
-    mu1_sq = mu1_real.pow(2) + mu1_imag.pow(2)
-    mu2_sq = mu2_real.pow(2) + mu2_imag.pow(2)
+    mu1_sq = mu1_real.clamp(min=1e-6).pow(2) + mu1_imag.clamp(min=1e-6).pow(2)
+    mu2_sq = mu2_real.clamp(min=1e-6).pow(2) + mu2_imag.clamp(min=1e-6).pow(2)
     mu1_mu2_real = mu1_real * mu2_real - mu1_imag * mu2_imag
     mu1_mu2_imag = mu1_real * mu2_imag + mu1_imag * mu2_real
 
     compensation = 1.0
 
-    x_sq = x_real.pow(2) + x_imag.pow(2)
-    y_sq = y_real.pow(2) + y_imag.pow(2)
+    x_sq = x_real.clamp(min=1e-6).pow(2) + x_imag.clamp(min=1e-6).pow(2)
+    y_sq = y_real.clamp(min=1e-6).pow(2) + y_imag.clamp(min=1e-6).pow(2)
     x_y_real = x_real * y_real - x_imag * y_imag
     x_y_imag = x_real * y_imag + x_imag * y_real
 

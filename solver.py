@@ -9,7 +9,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from metrics.evaluation import *
 from models.u_net import U_Net,R2U_Net,AttU_Net,R2AttU_Net,XXU_Net
-from models.unet import UNet, UNet_V1, UNet_V2, UNet_V3, UNet_V4
+from models.unet import UNet
 from models.swin_unet import SwinTransformerSys
 from models.transunet import TransUNetWithAttention
 from models.vit_seg_modeling import VisionTransformer as ViT_seg
@@ -20,8 +20,14 @@ import csv
 from losses.losses import MultiTaskLoss, FocalLoss, IoULoss, MultiLoss, GeneralizedL1Loss, NLLLoss
 from losses.ssim import SSIMLoss, MS_SSIMLoss
 
+METRICS = [MultiClassAccumulatedSPMetric(),\
+            MultiClassAccumulatedPCMetric(),\
+            MultiClassAccumulatedSEMetric(), \
+            MultiClassAccumulatedJSMetric(), \
+            MultiClassAccumulatedDCMetric()]
+
 class Solver(object):
-    def __init__(self, config, train_loader, valid_loader, metrics = [MultiClassAccumulatedSPMetric(),MultiClassAccumulatedPCMetric(),MultiClassAccumulatedSEMetric(), MultiClassAccumulatedJSMetric(), MultiClassAccumulatedDCMetric()]):
+    def __init__(self, config, train_loader, valid_loader, metrics = METRICS):
         # eveluation metric
         self.metrics = metrics
 
@@ -34,7 +40,7 @@ class Solver(object):
         self.unet = None
         self.optimizer = None
         self.img_ch = config.img_ch
-        self.size = config.image_size
+        self.size = config.input_size
         self.depth = config.depth
         self.width = config.width
         self.n_classes = config.n_classes
@@ -85,6 +91,10 @@ class Solver(object):
         self.init_loss() # init self.criterion
         self.ssim_loss = MS_SSIMLoss()
 
+        self.unet_path = os.path.join(self.model_path, '%s-%s-level%s-size%s-depth%s-width%s-n_classes%s-nhead%s-fold%s.pkl' \
+            %(self.model_type, self.loss_type, self.level, self.size, self.depth, \
+            self.width, self.n_classes, self.n_head, self.fold))
+
         # torch.autograd.set_detect_anomaly(True)
 
     def build_model(self):
@@ -97,16 +107,15 @@ class Solver(object):
             self.unet = AttU_Net(img_ch=3, n_classes = self.n_classes)
         elif self.model_type == 'R2AttU_Net':
             self.unet = R2AttU_Net(img_ch=3,t=self.t, n_classes = self.n_classes)
-        elif self.model_type in ['UNet', 'SEU_Net', 'CBAMU_Net', 'BAMU_Net']:
-            self.unet = UNet(img_ch=3, n_classes=self.n_classes, init_features=self.width, network_depth=self.depth, reduction_ratio=self.reduction_ratio, att_mode = self.att_mode)
-        elif self.model_type in ['SKU_Net','SKM1', 'SKM3', 'SK-SC-U_Net', 'SK-SE-U_Net', 'SK-CBAM-U_Net', 'SK-BAM-U_Net']:
-            self.unet = UNet_V1(img_ch=3, n_classes=self.n_classes, init_features=self.width, network_depth=self.depth, M=self.M, reduction_ratio=self.reduction_ratio, att_mode = self.att_mode, is_shortcut = self.is_shortcut, conv_type = self.conv_type)
-        elif self.model_type == 'MHU_Net':
-            self.unet = UNet_V2(img_ch=3, n_classes=self.n_classes, n_head = self.n_head, att_mode = self.att_mode, is_head_selective = False, is_shortcut = False, conv_type = self.conv_type)
-        elif self.model_type == 'SCU_Net':
-            self.unet = UNet_V3(img_ch=3, n_classes=self.n_classes, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = False, is_shortcut = True, conv_type = self.conv_type)
-        elif self.model_type in ['SSU_Net','SAtt','SS4','SS3', 'SS2', 'SK-SSU_Net', 'SE-SSU_Net', 'SC-SSU_Net' ]:
-            self.unet = UNet_V4(n_classes=self.n_classes, reduction_ratio=self.reduction_ratio, n_head = self.n_head, att_mode = self.att_mode, is_scale_selective = self.is_scale_selective, is_shortcut = self.is_shortcut, conv_type = self.conv_type)
+        elif self.model_type in ['UNet','SAFS','SK','BAM','SE','CBAM', 'BAM-SAFS','CBAM-SAFS','SE-SAFS','SK-SAFS', 'SK-BAM-SAFS']:
+            self.unet = UNet(n_classes=self.n_classes, \
+                init_features=self.width, \
+                reduction_ratio=self.reduction_ratio, \
+                n_head = self.n_head, \
+                att_mode = self.att_mode, \
+                is_scale_selective = self.is_scale_selective, \
+                is_shortcut = self.is_shortcut, \
+                conv_type = self.conv_type)
         elif self.model_type =='SwinUnet':
             # self.unet = SwinTransformerSys(img_size=self.size, num_classes = self.n_classes)
             self.unet = SwinU()
@@ -120,7 +129,14 @@ class Solver(object):
         else:
             raise NotImplementedError(self.model_type+" is not implemented")
 
-        self.optimizer = optim.Adam(list(self.unet.parameters()), self.lr, [self.beta1, self.beta2])
+        # self.optimizer = optim.Adam(list(self.unet.parameters()), self.lr, [self.beta1, self.beta2])
+        self.optimizer = optim.Adam(
+            list(self.unet.parameters()), 
+            lr=self.lr,          
+            betas=(self.beta1, self.beta2), 
+            weight_decay=1e-4        # example L2 regularization strength
+        )
+
         self.unet.to(self.device)
 
 #         self.print_network(self.unet, self.model_type)
@@ -177,9 +193,8 @@ class Solver(object):
         #====================================== Training ===========================================#
         #===========================================================================================#
 
-        unet_path = os.path.join(self.model_path, '%s-%s-level%s-size%s-depth%s-width%s-n_classes%s-alpha%s-gamma%s-nhead%s-fold%s.pkl'%(self.model_type, self.loss_type, self.level, self.size, self.depth, self.width, self.n_classes, self.alpha, self.gamma, self.n_head, self.fold))
-        unet_path_last = unet_path[0:-4]+'-%s.pkl'%self.start_epoch
-        print(unet_path)
+        unet_path_last = self.unet_path[0:-4]+'-%s.pkl'%self.start_epoch
+        print(self.unet_path)
         print(unet_path_last)
 
         # U-Net Train
@@ -350,63 +365,68 @@ class Solver(object):
                 best_unet_score = unet_score
                 best_unet = self.unet.state_dict()
                 print('Best %s model score : %.4f'%(self.model_type,best_unet_score))
-                torch.save(best_unet,unet_path)
+                torch.save(best_unet,self.unet_path)
                 
             # Save last epoch U-Net model
             if (epoch+1)==self.num_epochs:
-                best_unet = self.unet.state_dict()
-                unet_path_final = unet_path[0:-4]+'-%s.pkl'%(epoch+1)
-                torch.save(best_unet,unet_path_final)
-                
+                final_unet = self.unet.state_dict()
+                unet_path_final = self.unet_path[0:-4]+'-%s.pkl'%(epoch+1)
+                torch.save(final_unet,unet_path_final)
+        print('Best %s model score : %.4f'%(self.model_type,best_unet_score))
+
         # save losses against epochs after training
         if save_loss:
             for key in losses_disc.keys():
-                filename = unet_path[0:-4]+'-'+key+'.npy'
+                filename = self.unet_path[0:-4]+'-'+key+'.npy'
                 np.save(filename, np.array(losses_disc[key]))
                 
 
         #===================================== Test after finishing training====================================#
         del self.unet
         del best_unet
-        # self.test()
+        print('Test after finishing training')
+        self.test()
         
     def test(self):
-        unet_path = os.path.join(self.model_path, '%s-%s-level%s-size%s-depth%s-width%s-n_classes%s-alpha%s-gamma%s-nhead%s-fold%s.pkl'%(self.model_type, self.loss_type, self.level, self.size, self.depth, self.width, self.n_classes, self.alpha, self.gamma, self.n_head, self.fold))
+        print(self.unet_path)
         self.build_model()
-        self.unet.load_state_dict(torch.load(unet_path))
+        self.unet.load_state_dict(torch.load(self.unet_path))
 
         self.unet.train(False)
         self.unet.eval()
 
+
         # reset metrics
         for metric in self.metrics:
             metric.reset()
+        with torch.no_grad():
+            for i, (images, GT) in enumerate(self.valid_loader):
+                # print(f'{i+1}/{len(self.valid_loader)}')
+                mask = GT[0]
+                mask = mask.to(self.device)
+                label = GT[1].type(mask.type())
+                label = label.to(self.device)
+                images = images.to(self.device)
 
-        for i, (images, GT) in enumerate(self.valid_loader):
-            print(f'{i+1}/{len(self.valid_loader)}')
-            mask = GT[0]
-            mask = mask.to(self.device)
-            label = GT[1].type(mask.type())
-            label = label.to(self.device)
-            images = images.to(self.device)
+                SR, CR = self.unet(images)
+                # output_dict = self.unet(images)
+                # SR = output_dict['seg_output']
+                label = label.view(label.size(0),-1)
 
-            SR, CR = self.unet(images)
-            # output_dict = self.unet(images)
-            # SR = output_dict['seg_output']
-            label = label.view(label.size(0),-1)
-
-            for metric in self.metrics:
-                # cls metric: ACC F1
-                if metric.name()=='Accuracy' or metric.name()=='F1':
-                    print('Accuracy')
-                    # metric(CR,label)
-                # seg metric: JS DC
-                else:
-                    metric(SR,mask, label = self.category)
-                    # metric(SR,mask)
+                for metric in self.metrics:
+                    # cls metric: ACC F1
+                    if metric.name()=='Accuracy' or metric.name()=='F1':
+                        print('Accuracy')
+                        # metric(CR,label)
+                    # seg metric: JS DC
+                    else:
+                        metric(SR,mask, label = self.category)
+                        # metric(SR,mask)
 
 
-        f = open(os.path.join(self.result_path,'result_fives.csv'), 'a', encoding='utf-8', newline='')
+        f = open(os.path.join(self.result_path,'result_monuseg.csv'), 'a', encoding='utf-8', newline='')
         wr = csv.writer(f)
-        wr.writerow([self.model_type, self.loss_type, self.level, self.size, self.depth, self.width, self.n_classes, self.alpha, self.gamma, self.n_head, self.fold]+[float(metric.value()) for metric in self.metrics])
+        print([float(metric.value()) for metric in self.metrics])
+        wr.writerow([self.model_type, self.loss_type, self.level, self.size, self.depth, self.width, \
+            self.n_classes, self.alpha, self.gamma, self.n_head, self.fold]+[float(metric.value()) for metric in self.metrics])
         f.close()

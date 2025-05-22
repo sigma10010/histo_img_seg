@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from torch.utils import data
 from torchvision import transforms as T
-from torchvision import transforms
 from torchvision.transforms import functional as F
 from PIL import Image, ImageDraw
 
@@ -15,7 +14,7 @@ else:
 import shutil
 import random
 
-class MoNuSeg(data.Dataset):
+class TNBC(data.Dataset):
     """
     General Histo dataset:
     input: root path of images, list to indicate indexes of slide
@@ -27,7 +26,7 @@ class MoNuSeg(data.Dataset):
         
     )
 
-    def __init__(self, img_root, anno_root, size=256, data_aug=True, prob=0.5, transform=None):
+    def __init__(self, img_root, anno_root, data_aug=True, prob=0.5, num_slide=1, is_train=True, transform=None):
         """
         Args:
             root_dir (string): Directory with all the images, root_dir/slides/images.
@@ -36,31 +35,23 @@ class MoNuSeg(data.Dataset):
         """
         self.img_root = img_root
         self.anno_root = anno_root
-        cls = MoNuSeg.CLASSES
+        self.num_slide = num_slide
+        self.is_train = is_train
+        cls = TNBC.CLASSES
         self.category2id = dict(zip(cls, range(len(cls))))
         self.id2category = dict(zip(range(len(cls)), cls))
         
         self.data_aug = data_aug
         self.prob = prob
         self.transform = transform
-
-        self.im_trans = transforms.Compose([
-                                transforms.Resize(size, interpolation=Image.BILINEAR),
-                                transforms.ToTensor()
-                             ])
-        self.mask_trans = transforms.Compose([
-                            transforms.Resize(size, interpolation=Image.NEAREST),
-                            transforms.ToTensor()
-                         ])
         
 
     def __len__(self):
-        return len(self.walk_root_dir()[0])
+        return len(self.leave_one_out()[0])
 
     def __getitem__(self, idx):
         image, mask, label = self.pull_item(idx)
         if self.data_aug:
-            # print('perform data augmentation')
             cj = T.ColorJitter(0.2,0.2,0.1,0.1)
             image = cj(image)
             
@@ -81,11 +72,8 @@ class MoNuSeg(data.Dataset):
                 mask = RR(mask)
         
         if self.transform is not None:
-            image = self.im_trans(image)
-            mask = self.mask_trans(mask)
-
-            # image = self.transform(image)
-            # mask = self.transform(mask)
+            image = self.transform(image)
+            mask = self.transform(mask)
         
         return image, (mask, label)
 
@@ -105,23 +93,42 @@ class MoNuSeg(data.Dataset):
         t=transforms.ToPILImage()
         img = t(x)
         return img
-        
+
+    def leave_one_out(self):
+        # img_root = './datasets/TNBC_NucleiSegmentation/slide/'
+        wholePathes=[]
+        annoWholePathes=[]
+
+        validWholePathes=[]
+        validAnnoWholePathes=[]
+        for slide in os.listdir(self.img_root):
+            # print(int(slide.split('_')[-1]))
+            names1, wholePathes1, annoNames1, annoWholePathes1 = self.walk_root_dir(os.path.join(self.img_root, slide))
+            if int(slide.split('_')[-1])!=self.num_slide:
+                wholePathes.extend(wholePathes1)
+                annoWholePathes.extend(annoWholePathes1)
+            else:
+                validWholePathes.extend(wholePathes1)
+                validAnnoWholePathes.extend(annoWholePathes1)
+        if self.is_train:
+            return wholePathes, annoWholePathes
+        else:
+            return validWholePathes, validAnnoWholePathes
     
-    def walk_root_dir(self):
+    def walk_root_dir(self, img_root):
         names=[]
         wholePathes=[]
         annoNames=[]
         annoWholePathes=[]
-        for dirpath, subdirs, files in os.walk(self.img_root):
+        for dirpath, subdirs, files in os.walk(img_root):
             for x in files:
                 if x.endswith(('.png','.jpg', '.jpeg', '.tif')):
                     names.append(x)
-                    wholePathes.append(os.path.join(dirpath, x))
-                    y = x.split('.')[0]+'_mask.bmp'
-#                     y = x.split('.')[0]+'_det.xml'
-                    annoNames.append(y)
-                    annoWholePathes.append(os.path.join(dirpath, y))
-                    # annoWholePathes.append(os.path.join(self.anno_root, y))
+                    img_path = os.path.join(dirpath, x)
+                    wholePathes.append(img_path)
+                    mask_path = img_path.replace('/slide/', '/gt/').replace('/Slide_', '/GT_')
+                    annoNames.append(x)
+                    annoWholePathes.append(mask_path)
 
         return names, wholePathes, annoNames, annoWholePathes
     
@@ -211,7 +218,7 @@ class MoNuSeg(data.Dataset):
                    target is the object returned by ``coco.loadAnns``.
         """
         # load the image as a PIL Image
-        imgNames, imgWholePathes, annoNames, annoWholePathes = self.walk_root_dir()
+        imgWholePathes, annoWholePathes = self.leave_one_out()
         img_name = imgWholePathes[idx]
         image = Image.open(img_name).convert("RGB")
 
